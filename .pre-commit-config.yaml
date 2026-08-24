@@ -1,0 +1,39 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types_or: [python, pyi]
+      - id: export-requirements
+        name: export requirements.txt
+        entry: uv export --format requirements-txt --no-dev --no-hashes --no-header --no-annotate --frozen --output-file requirements.txt
+        language: system
+        pass_filenames: false
+        files: ^(pyproject\.toml|uv\.lock)$
+      - id: check-yaml
+        name: check yaml
+        entry: uv run check-yaml
+        language: system
+        types: [yaml]
+      - id: end-of-file-fixer
+        name: end of file fixer
+        entry: uv run end-of-file-fixer
+        language: system
+        types: [text]
+      - id: trailing-whitespace
+        name: trailing whitespace
+        entry: uv run trailing-whitespace-fixer
+        language: system
+        types: [text]
+      - id: check-json
+        name: check json
+        entry: uv run check-json
+        language: system
+        types: [json]

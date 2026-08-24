@@ -1,0 +1,26 @@
+[project]
+name = "cmc-pseudopolynomials-compare"
+version = "0.1.0"
+description = "Построение ПСПФ булевых функций по алгоритму dm1658"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = ["pre-commit", "pre-commit-hooks", "pytest", "ruff"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = ["docs/superpowers"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
