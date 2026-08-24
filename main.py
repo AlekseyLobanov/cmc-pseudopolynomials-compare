@@ -58,7 +58,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.input,
                 args.out,
                 args.k,
-                calculate_pspf,
+                build_pspf,
                 include_length=not args.no_length,
             )
     except (BooleanFunctionError, TexTableError, ValueError) as error:

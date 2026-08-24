@@ -9,32 +9,46 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from pspf import PSPF, format_pspf, pspf_length
+from pspf_parser import PSPFParseError, parse_pspf_polynomial
 
 ORIGINAL_EXPRESSION_WIDTH = "11cm"
 OUTPUT_EXPRESSION_WIDTH = "5.5cm"
 CONSTRUCTED_LENGTH_COLUMN = "r"
-ORIGINAL_HEADER = "Длина функции & Номер & ПСПФ"
-OUTPUT_HEADER = "Длина функции & Номер & Оптимальная ПСПФ & Длина построенной & Построенная ПСПФ"
-OUTPUT_HEADER_WITHOUT_LENGTH = "Длина функции & Номер & Оптимальная ПСПФ & Построенная ПСПФ"
+ORIGINAL_HEADER = "Номер класса & Длина функции & Мощность & ПСПФ"
+OUTPUT_HEADER = (
+    "Номер класса & Длина функции & Мощность & Оптимальная ПСПФ & "
+    "Длина построенной & Построенная ПСПФ"
+)
+OUTPUT_HEADER_WITHOUT_LENGTH = (
+    "Номер класса & Длина функции & Мощность & Оптимальная ПСПФ & Построенная ПСПФ"
+)
+OUTPUT_COLUMN_SPEC = (
+    f"| l| r | r | p{{{OUTPUT_EXPRESSION_WIDTH}}}| {CONSTRUCTED_LENGTH_COLUMN} | "
+    f"p{{{OUTPUT_EXPRESSION_WIDTH}}}|"
+)
+OUTPUT_COLUMN_SPEC_WITHOUT_LENGTH = (
+    f"| l| r | r | p{{{OUTPUT_EXPRESSION_WIDTH}}}| p{{{OUTPUT_EXPRESSION_WIDTH}}}|"
+)
 
 DATA_ROW_RE = re.compile(
-    r"^(?P<indent>\s*)(?P<length>\d+)(?P<sep1>\s*&\s*)"
-    r"(?P<number>\d+)(?P<sep2>\s*&\s*)\$(?P<expression>[^$&]*)\$"
-    r"(?P<ending>\\\\\s*)(?P<newline>\r?\n)?$"
+    r"^(?P<indent>\s*)(?P<class_number>\d+)(?P<sep1>\s*&\s*)"
+    r"(?P<length>\d+)(?P<sep2>\s*&\s*)(?P<cardinality>\d+)"
+    r"(?P<sep3>\s*&\s*)\$(?P<expression>[^$&]*)\$"
+    r"(?P<ending>[ \t]*\\\\\s*)(?P<newline>\r?\n)?$"
 )
 POTENTIAL_DATA_ROW_RE = re.compile(r"^\s*\d+\s*&")
 BEGIN_LONGTABLE_RE = re.compile(r"^[ \t]*\\begin\{longtable\}\{.*\}[ \t]*(?:\r?\n)?$")
 TARGET_BEGIN_LONGTABLE_RE = re.compile(
-    rf"^[ \t]*\\begin\{{longtable\}}\{{\|[ \t]*l[ \t]*\|[ \t]*r[ \t]*\|[ \t]*p"
-    rf"\{{{re.escape(ORIGINAL_EXPRESSION_WIDTH)}\}}\|\}}[ \t]*(?:\r?\n)?$"
+    rf"^(?P<indent>[ \t]*)\\begin\{{longtable\}}\{{\|[ \t]*l[ \t]*\|[ \t]*r[ \t]*"
+    rf"\|[ \t]*p\{{{re.escape(ORIGINAL_EXPRESSION_WIDTH)}\}}\|\}}[ \t]*"
+    rf"(?P<newline>\r?\n)?$"
 )
 END_LONGTABLE_RE = re.compile(r"^[ \t]*\\end\{longtable\}[ \t]*(?:\r?\n)?$")
 HEADER_RE = re.compile(rf"^[ \t]*{re.escape(ORIGINAL_HEADER)}[ \t]*\\\\[ \t]*(?:\r?\n)?$")
 MULTICOLUMN_CONTINUATION_RE = re.compile(
-    r"^(?P<prefix>[ \t]*(?:\\hline[ \t]+)?\\multicolumn\{)3"
+    r"^(?P<prefix>[ \t]*(?:\\hline[ \t]+)?\\multicolumn\{)4"
     r"(?P<suffix>\}\{[lcr]\}\{.*\}[ \t]*\\\\[ \t]*(?:\r?\n)?)$"
 )
-WIDTH_RE = re.compile(rf"p\{{{re.escape(ORIGINAL_EXPRESSION_WIDTH)}\}}\|")
 
 
 class TexTableError(ValueError):
@@ -44,7 +58,7 @@ class TexTableError(ValueError):
 def enrich_tex_table(
     text: str,
     k: int,
-    builder: Callable[[int, int], PSPF],
+    builder: Callable[[set[int], int], PSPF],
     source_name: str = "<input>",
     *,
     include_length: bool = True,
@@ -104,7 +118,7 @@ def enrich_tex_table(
 def _transform_table(
     table_lines: list[tuple[int, str]],
     k: int,
-    builder: Callable[[int, int], PSPF],
+    builder: Callable[[set[int], int], PSPF],
     source_name: str,
     include_length: bool,
 ) -> tuple[list[str], bool, int]:
@@ -123,16 +137,24 @@ def _transform_table(
             match = DATA_ROW_RE.match(line)
             if match is None:
                 raise TexTableError(f"{source_name}:{line_number}: malformed data row")
-            built = builder(int(match["number"]), k)
+            try:
+                polynomial = parse_pspf_polynomial(match["expression"], k)
+            except PSPFParseError as error:
+                raise TexTableError(
+                    f"{source_name}:{line_number}: invalid PSPF: {error}"
+                ) from error
+            built = builder(polynomial, k)
             length_cell = f"{pspf_length(built)} & " if include_length else ""
             transformed.append(
                 "".join(
                     (
                         match["indent"],
-                        match["length"],
+                        match["class_number"],
                         match["sep1"],
-                        match["number"],
+                        match["length"],
                         match["sep2"],
+                        match["cardinality"],
+                        match["sep3"],
                         "$",
                         match["expression"],
                         "$ & ",
@@ -149,14 +171,17 @@ def _transform_table(
             continue
 
         if TARGET_BEGIN_LONGTABLE_RE.match(line):
-            length_column = f" {CONSTRUCTED_LENGTH_COLUMN} |" if include_length else ""
-            replacement = (
-                f"p{{{OUTPUT_EXPRESSION_WIDTH}}}|{length_column} p{{{OUTPUT_EXPRESSION_WIDTH}}}|"
+            match = TARGET_BEGIN_LONGTABLE_RE.match(line)
+            assert match is not None
+            column_spec = (
+                OUTPUT_COLUMN_SPEC if include_length else OUTPUT_COLUMN_SPEC_WITHOUT_LENGTH
             )
-            transformed.append(WIDTH_RE.sub(replacement, line))
+            transformed.append(
+                f"{match['indent']}\\begin{{longtable}}{{{column_spec}}}{match['newline'] or ''}"
+            )
             continue
 
-        column_count = "5" if include_length else "4"
+        column_count = "6" if include_length else "5"
         transformed.append(
             MULTICOLUMN_CONTINUATION_RE.sub(rf"\g<prefix>{column_count}\g<suffix>", line)
         )
@@ -174,7 +199,7 @@ def write_enriched_table(
     input_path: Path,
     output_path: Path,
     k: int,
-    builder: Callable[[int, int], PSPF],
+    builder: Callable[[set[int], int], PSPF],
     *,
     include_length: bool = True,
 ) -> None:

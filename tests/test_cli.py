@@ -11,8 +11,8 @@ from boolean_functions import evaluate_zhegalkin, zhegalkin_from_number
 ROOT = Path(__file__).parents[1]
 REFERENCE_TABLE = ROOT / "references" / "tex_data.txt"
 MINIMAL_TABLE = """\\begin{longtable}{| l| r | p{11cm}|}
-Длина функции & Номер & ПСПФ\\\\
-1 & 0 & $0$\\\\
+Номер класса & Длина функции & Мощность & ПСПФ\\\\
+1 & 1 & 1 & $0$ \\\\
 \\end{longtable}
 """
 
@@ -107,7 +107,8 @@ def test_generate_table_enriches_the_reference_table(tmp_path: Path) -> None:
     assert result.stdout == ""
     output = output_path.read_text(encoding="utf-8")
     assert (
-        "Длина функции & Номер & Оптимальная ПСПФ & Длина построенной & Построенная ПСПФ"
+        "Номер класса & Длина функции & Мощность & Оптимальная ПСПФ & "
+        "Длина построенной & Построенная ПСПФ"
     ) in output
     input_lines = input_path.read_text(encoding="utf-8").splitlines()
     original_rows = [line for line in input_lines if " & $" in line]
@@ -115,12 +116,13 @@ def test_generate_table_enriches_the_reference_table(tmp_path: Path) -> None:
     assert len(original_rows) == 32
     assert len(constructed_rows) == 32
     assert all(
-        constructed.startswith(original[:-2] + " & ")
+        constructed.startswith(original.removesuffix("\\\\").rstrip() + " & ")
         for original, constructed in zip(original_rows, constructed_rows, strict=True)
     )
+    assert all(row.count("&") == 5 for row in constructed_rows)
 
 
-def test_generate_table_no_length_keeps_four_output_columns(tmp_path: Path) -> None:
+def test_generate_table_no_length_keeps_five_output_columns(tmp_path: Path) -> None:
     input_path = tmp_path / "minimal.tex"
     output_path = tmp_path / "out.tex"
     input_path.write_text(MINIMAL_TABLE, encoding="utf-8")
@@ -135,9 +137,11 @@ def test_generate_table_no_length_keeps_four_output_columns(tmp_path: Path) -> N
 
     assert result.returncode == 0
     output = output_path.read_text(encoding="utf-8")
-    assert "Длина функции & Номер & Оптимальная ПСПФ & Построенная ПСПФ" in output
+    assert (
+        "Номер класса & Длина функции & Мощность & Оптимальная ПСПФ & Построенная ПСПФ"
+    ) in output
     assert "Длина построенной" not in output
-    assert "1 & 0 & $0$ & $0$\\\\" in output
+    assert "1 & 1 & 1 & $0$ & $0$" in output
 
 
 def test_generate_table_warns_once_for_k_five(tmp_path: Path) -> None:
