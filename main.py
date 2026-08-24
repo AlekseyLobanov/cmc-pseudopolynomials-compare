@@ -8,16 +8,21 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from boolean_functions import BooleanFunctionError, zhegalkin_from_number
-from pspf import build_pspf, format_pspf
+from pspf import PSPF, build_pspf, format_pspf
 from tex_table import TexTableError, write_enriched_table
 
 WARNING = "warning: k >= 5; computation may require exponential time and memory"
 
 
+def calculate_pspf(number: int, k: int) -> PSPF:
+    """Construct a PSPF for a Boolean function number."""
+    polynomial = zhegalkin_from_number(number, k)
+    return build_pspf(polynomial, k)
+
+
 def calculate_expression(number: int, k: int) -> str:
     """Construct a formatted PSPF for a Boolean function number."""
-    polynomial = zhegalkin_from_number(number, k)
-    return format_pspf(build_pspf(polynomial, k))
+    return format_pspf(calculate_pspf(number, k))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -33,6 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     table_parser.add_argument("--k", type=int, default=4)
     table_parser.add_argument("input", type=Path)
     table_parser.add_argument("--out", type=Path, required=True)
+    table_parser.add_argument("--no-length", action="store_true")
     return parser
 
 
@@ -48,7 +54,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "calculate":
             print(calculate_expression(args.number, args.k))
         else:
-            write_enriched_table(args.input, args.out, args.k, calculate_expression)
+            write_enriched_table(
+                args.input,
+                args.out,
+                args.k,
+                calculate_pspf,
+                include_length=not args.no_length,
+            )
     except (BooleanFunctionError, TexTableError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2

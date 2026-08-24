@@ -9,6 +9,7 @@ from pspf import (
     expand_pseudomonomial,
     format_pspf,
     multiply_polynomials,
+    pspf_length,
 )
 
 
@@ -25,6 +26,19 @@ def test_formats_factors_and_constant_deterministically() -> None:
     term = PseudoMonomial((LinearFactor((3, 2)), LinearFactor((3, 1))))
     assert format_pspf(PSPF((term,), True)) == "(x_3 + x_2) (x_3 + x_1) + 1"
     assert format_pspf(PSPF((), False)) == "0"
+
+
+@pytest.mark.parametrize(
+    ("pspf", "expected"),
+    [
+        (PSPF((), False), 1),
+        (PSPF((), True), 1),
+        (PSPF((PseudoMonomial((LinearFactor((1,)),)),), False), 1),
+        (PSPF((PseudoMonomial((LinearFactor((1,)),)),), True), 2),
+    ],
+)
+def test_pspf_length_counts_top_level_summands(pspf: PSPF, expected: int) -> None:
+    assert pspf_length(pspf) == expected
 
 
 def expand_pspf(result: PSPF, k: int) -> set[int]:

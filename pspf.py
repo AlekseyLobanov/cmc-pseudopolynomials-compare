@@ -17,6 +17,11 @@ class PSPF:
     constant: bool = False
 
 
+def pspf_length(pspf: PSPF) -> int:
+    """Return the number of top-level summands in a PSPF."""
+    return max(1, len(pspf.terms) + int(pspf.constant))
+
+
 def multiply_polynomials(left: set[int], right: set[int]) -> set[int]:
     result: set[int] = set()
     for left_mask in left:

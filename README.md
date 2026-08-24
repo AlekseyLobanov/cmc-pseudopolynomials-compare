@@ -14,6 +14,7 @@ https://docs.astral.sh/uv/getting-started/installation/
 uv sync
 uv run main.py calculate --k=4 27031
 uv run main.py generate_table --k=4 --out=out.tex references/tex_data.txt
+uv run main.py generate_table --k=4 --no-length --out=out.tex references/tex_data.txt
 ```
 
 Число переменных, `k` по умолчанию равно 4.
@@ -21,6 +22,9 @@ uv run main.py generate_table --k=4 --out=out.tex references/tex_data.txt
 
 Команда `calculate` выводит построенное выражение в стандартный вывод.
 Команда `generate_table` записывает обогащённую таблицу в файл, указанный параметром `--out`.
+По умолчанию между оптимальной и построенной ПСПФ добавляется столбец `Длина построенной`
+с количеством верхнеуровневых слагаемых построенной ПСПФ. Флаг `--no-length` отключает этот
+столбец и сохраняет прежний четырёхколоночный формат результата.
 
 ### Тесты
 

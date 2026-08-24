@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from pspf import PSPF
 from tex_table import enrich_tex_table
 
 DATA_ROW_RE = re.compile(
@@ -122,9 +123,9 @@ def test_all_reference_rows_parse_and_enrich() -> None:
     rows = load_reference_rows()
     numbers: list[int] = []
 
-    def record_number(number: int, k: int) -> str:
+    def record_number(number: int, k: int) -> PSPF:
         numbers.append(number)
-        return "0"
+        return PSPF((), False)
 
     source = (Path(__file__).parents[1] / "references" / "tex_data.txt").read_text(encoding="utf-8")
     enriched = enrich_tex_table(source, 4, record_number)
